@@ -1,0 +1,42 @@
+minio:
+  url: http://localhost:9000
+  access-key: newuser
+  secret-key: newpassword
+  bucket-name: ecommerce-images
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ecommerce
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update  # Автоматическое обновление схемы базы данных
+    show-sql: true  # Показывать SQL-запросы в логах
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect  # Диалект для PostgreSQL
+  servlet:
+    multipart:
+      enabled: true
+      file-size-threshold: 2KB
+      max-file-size: 200MB
+      max-request-size: 200MB
+#  mail:
+#    host:
+#    port:
+#    username:
+#    password:
+#    properties:
+#      mail:
+#        smtp:
+#          auth:
+#          starttls:
+#            enable:
+
+
+
+logging:
+  level:
+    org.springframework: DEBUG
