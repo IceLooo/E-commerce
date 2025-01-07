@@ -1,21 +1,27 @@
 package kz.zhanayev.ecommerce.controllers.user;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import kz.zhanayev.ecommerce.dto.*;
-import kz.zhanayev.ecommerce.facade.AddressFacade;
 import kz.zhanayev.ecommerce.models.*;
 import kz.zhanayev.ecommerce.services.*;
+import kz.zhanayev.ecommerce.util.mappers.AddressMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/user")
+@Tag(name = "User API", description = "API для работы с действиями пользователей")
 public class UserController {
-
 
     private final ProductService productService;
     private final CartService cartService;
@@ -26,12 +32,10 @@ public class UserController {
     private final BrandService brandService;
     private final FeatureService featureService;
     private final UserService userService;
-    private final AddressFacade addressFacade;
 
     public UserController(ProductService productService, CartService cartService, PaymentService paymentService,
                           OrderService orderService, ReviewService reviewService, CategoryService categoryService,
-                          BrandService brandService, FeatureService featureService, UserService userService,
-                          AddressFacade addressFacade) {
+                          BrandService brandService, FeatureService featureService, UserService userService) {
         this.productService = productService;
         this.cartService = cartService;
         this.paymentService = paymentService;
@@ -41,160 +45,303 @@ public class UserController {
         this.brandService = brandService;
         this.featureService = featureService;
         this.userService = userService;
-        this.addressFacade = addressFacade;
     }
 
+    private ResponseEntity<Map<String, Object>> standardResponse(String statusMessage, Object payload) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status_message", statusMessage);
+        response.put("payload", payload);
+        return ResponseEntity.ok(response);
+    }
 
-
-    //методы для продуктов
     @GetMapping("/products")
-    public ResponseEntity<Page<ProductDTO>> getProducts(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "name") String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDir,
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) BigDecimal minPrice,
-            @RequestParam(required = false) BigDecimal maxPrice,
-            @RequestParam(required = false) Boolean inStock) {
+    @Operation(
+            summary = "Получить список продуктов",
+            description = "Возвращает список всех продуктов с возможностью фильтрации и пагинации",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Успешное получение списка продуктов"),
+                    @ApiResponse(responseCode = "400", description = "Неверный запрос")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getProducts(
+            @Parameter(description = "Номер страницы", example = "0") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Размер страницы", example = "10") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Поле для сортировки", example = "name") @RequestParam(defaultValue = "name") String sortBy,
+            @Parameter(description = "Направление сортировки", example = "asc") @RequestParam(defaultValue = "asc") String sortDir,
+            @Parameter(description = "Название продукта для поиска", example = "Laptop") @RequestParam(required = false) String name,
+            @Parameter(description = "Категория продукта", example = "Electronics") @RequestParam(required = false) String category,
+            @Parameter(description = "Минимальная цена", example = "1000") @RequestParam(required = false) BigDecimal minPrice,
+            @Parameter(description = "Максимальная цена", example = "5000") @RequestParam(required = false) BigDecimal maxPrice,
+            @Parameter(description = "Наличие на складе", example = "true") @RequestParam(required = false) Boolean inStock) {
         Page<ProductDTO> products = productService.getFilteredProducts(name, category, minPrice, maxPrice, inStock, page, size, sortBy, sortDir);
-        return ResponseEntity.ok(products);
+        return standardResponse("Продукты получены успешно", products);
     }
 
     @GetMapping("/products/{id}")
-    public ResponseEntity<ProductDTO> getProductById(@PathVariable Long id) {
+    @Operation(
+            summary = "Получить продукт по ID",
+            description = "Возвращает информацию о продукте по его уникальному идентификатору",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Успешное получение данных продукта"),
+                    @ApiResponse(responseCode = "404", description = "Продукт не найден")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getProductById(@PathVariable Long id) {
         ProductDTO product = productService.getProductById(id);
-        return ResponseEntity.ok(product);
+        return standardResponse("Продукт успешно получен", product);
     }
 
-
-
-    //методы для корзины
     @PostMapping("/cart")
-    public ResponseEntity<CartDTO> addItemToCart(@RequestBody CartItemDTO cartItemDTO) {
+    @Operation(
+            summary = "Добавить элемент в корзину",
+            description = "Добавляет элемент в корзину текущего пользователя",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Элемент успешно добавлен в корзину"),
+                    @ApiResponse(responseCode = "400", description = "Ошибка в данных запроса")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> addItemToCart(@RequestBody CartItemDTO cartItemDTO) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         Long userId = userService.getUserByUsername(username).getId();
         CartDTO updatedCart = cartService.addItemToCart(userId, cartItemDTO);
-        return ResponseEntity.ok(updatedCart);
+        return standardResponse("Товар успешно добавлен в корзину", updatedCart);
     }
 
     @DeleteMapping("/cart/{itemId}")
-    public ResponseEntity<CartDTO> removeItemFromCart(@PathVariable Long itemId) {
+    @Operation(
+            summary = "Удалить элемент из корзины",
+            description = "Удаляет элемент из корзины текущего пользователя",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Элемент успешно удалён из корзины"),
+                    @ApiResponse(responseCode = "404", description = "Элемент не найден в корзине")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> removeItemFromCart(@PathVariable Long itemId) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         Long userId = userService.getUserByUsername(username).getId();
         CartDTO updatedCart = cartService.removeItemFromCart(userId, itemId);
-        return ResponseEntity.ok(updatedCart);
+        return standardResponse("Товар успешно удален из корзины", updatedCart);
     }
 
     @PostMapping("/cart/clear")
-    public ResponseEntity<CartDTO> clearCart() {
+    @Operation(
+            summary = "Очистить корзину",
+            description = "Очищает корзину текущего пользователя",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Корзина успешно очищена")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> clearCart() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         Long userId = userService.getUserByUsername(username).getId();
         CartDTO updatedCart = cartService.clearCart(userId);
-        return ResponseEntity.ok(updatedCart);
+        return standardResponse("Корзина успешно очищена", updatedCart);
     }
 
-
-    //метод для оплаты
     @PostMapping("/payments")
-    public ResponseEntity<PaymentDTO> processPayment(@RequestBody CardPaymentRequest paymentRequest) {
+    @Operation(
+            summary = "Обработать платёж",
+            description = "Производит обработку платежа для указанного заказа",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Платёж успешно обработан"),
+                    @ApiResponse(responseCode = "400", description = "Ошибка в данных платежа")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> processPayment(@RequestBody CardPaymentRequest paymentRequest) {
         PaymentDTO payment = paymentService.processPayment("credit_card", paymentRequest, paymentRequest.getOrderId());
-        return ResponseEntity.ok(payment);
+        return standardResponse("Платеж успешно обработан", payment);
     }
 
     @GetMapping("/payments/order/{orderId}")
-    public ResponseEntity<PaymentDTO> getPaymentByOrderId(@PathVariable Long orderId) {
+    @Operation(
+            summary = "Получить платёж по ID заказа",
+            description = "Возвращает информацию о платеже по указанному ID заказа",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Данные о платеже успешно получены"),
+                    @ApiResponse(responseCode = "404", description = "Платёж не найден")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getPaymentByOrderId(@PathVariable Long orderId) {
         PaymentDTO payment = paymentService.getPaymentByOrderId(orderId);
-        return ResponseEntity.ok(payment);
+        return standardResponse("Платеж получен успешно", payment);
     }
 
-
-    //методы для заказа
     @PostMapping("/orders")
-    public ResponseEntity<OrderDTO> createOrder(@RequestParam Long userId, @RequestBody AddressDTO addressDTO) {
-        Address address = addressFacade.dtoToEntity(addressDTO);
-        OrderDTO createdOrder = orderService.createOrderFromCart(userId, address);
-        return ResponseEntity.ok(createdOrder);
+    @Operation(
+            summary = "Создать заказ",
+            description = "Создаёт заказ на основе текущей корзины пользователя",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Заказ успешно создан"),
+                    @ApiResponse(responseCode = "400", description = "Ошибка в данных заказа")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> createOrder(@RequestBody AddressDTO addressDTO) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userService.getUserByUsername(username);
+
+        Address address = AddressMapper.toEntity(addressDTO, user);
+        OrderDTO createdOrder = orderService.createOrderFromCart(user.getId(), address);
+        return standardResponse("Заказ успешно создан", createdOrder);
     }
 
     @GetMapping("/orders")
-    public ResponseEntity<List<OrderDTO>> getUserOrders(@RequestParam Long userId) {
+    @Operation(
+            summary = "Получить заказы пользователя",
+            description = "Возвращает список заказов текущего пользователя",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Заказы успешно получены")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getUserOrders(@RequestParam Long userId) {
         List<OrderDTO> orders = orderService.getAllOrdersByUserId(userId);
-        return ResponseEntity.ok(orders);
+        return standardResponse("Заказы пользователей успешно получены", orders);
     }
 
     @GetMapping("/orders/{id}")
-    public ResponseEntity<OrderDTO> getOrderById(@PathVariable Long id, @RequestParam Long userId) {
+    @Operation(
+            summary = "Получить заказ по ID",
+            description = "Возвращает информацию о заказе по его ID",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Информация о заказе успешно получена"),
+                    @ApiResponse(responseCode = "404", description = "Заказ не найден")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getOrderById(@PathVariable Long id, @RequestParam Long userId) {
         OrderDTO order = orderService.getOrderById(id);
-        return ResponseEntity.ok(order);
+        return standardResponse("Заказ получен успешно", order);
     }
 
     @DeleteMapping("/orders/{id}/delete")
-    public ResponseEntity<String> deleteOrder(@PathVariable Long id, @RequestParam Long userId) {
+    @Operation(
+            summary = "Удалить заказ",
+            description = "Удаляет заказ по его ID",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Заказ успешно удалён"),
+                    @ApiResponse(responseCode = "404", description = "Заказ не найден")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> deleteOrder(@PathVariable Long id, @RequestParam Long userId) {
         orderService.deleteOrder(id, userId);
-        return ResponseEntity.ok("Order deleted successfully");
+        return standardResponse("Заказ успешно удален", null);
     }
 
-
-    //методы для отзыва
     @PostMapping("/reviews")
-    public ResponseEntity<ReviewDTO> addReview(@RequestBody ReviewDTO reviewDTO) {
+    @Operation(
+            summary = "Добавить отзыв",
+            description = "Добавляет отзыв к указанному продукту",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Отзыв успешно добавлен"),
+                    @ApiResponse(responseCode = "400", description = "Ошибка в данных отзыва")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> addReview(@RequestBody ReviewDTO reviewDTO) {
         ReviewDTO createdReview = reviewService.addReview(reviewDTO.getProductId(), reviewDTO.getUserId(), reviewDTO);
-        return ResponseEntity.ok(createdReview);
+        return standardResponse("Отзыв успешно добавлен", createdReview);
     }
 
     @GetMapping("/reviews/product/{productId}")
-    public ResponseEntity<List<ReviewDTO>> getProductReviews(@PathVariable Long productId) {
+    @Operation(
+            summary = "Получить отзывы о продукте",
+            description = "Возвращает список отзывов для указанного продукта",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Отзывы успешно получены")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getProductReviews(@PathVariable Long productId) {
         List<ReviewDTO> reviews = reviewService.getReviewsByProductId(productId);
-        return ResponseEntity.ok(reviews);
+        return standardResponse("Успешно получены отзывы о продукте", reviews);
     }
 
     @GetMapping("/reviews/user/{userId}")
-    public ResponseEntity<List<ReviewDTO>> getReviewsByUserId(@PathVariable Long userId) {
+    @Operation(
+            summary = "Получить отзывы пользователя",
+            description = "Возвращает список отзывов, оставленных пользователем",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Отзывы успешно получены")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getReviewsByUserId(@PathVariable Long userId) {
         List<ReviewDTO> reviews = reviewService.getReviewsByUserId(userId);
-        return ResponseEntity.ok(reviews);
+        return standardResponse("Отзывы пользователей получены успешно", reviews);
     }
 
-
-    // методы для категории
     @GetMapping("/categories")
-    public ResponseEntity<List<CategoryDTO>> getAllCategories() {
-        return ResponseEntity.ok(categoryService.getAllCategories());
+    @Operation(
+            summary = "Получить категории",
+            description = "Возвращает список всех категорий",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Категории успешно получены")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getAllCategories() {
+        return standardResponse("Категории выбраны успешно", categoryService.getAllCategories());
     }
-
 
     @GetMapping("/categories/{id}")
-    public ResponseEntity<CategoryDTO> getCategoryById(@PathVariable Long id) {
-        return ResponseEntity.ok(categoryService.getCategoryById(id));
+    @Operation(
+            summary = "Получить категорию по ID",
+            description = "Возвращает данные категории по её уникальному идентификатору",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Категория успешно получена"),
+                    @ApiResponse(responseCode = "404", description = "Категория не найдена")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getCategoryById(@PathVariable Long id) {
+        return standardResponse("Категория выбрана успешно", categoryService.getCategoryById(id));
     }
 
-
-    //методы для брендов
     @GetMapping("/brands")
-    public ResponseEntity<List<BrandDTO>> getAllBrands() {
-        return ResponseEntity.ok(brandService.getAllBrands());
+    @Operation(
+            summary = "Получить бренды",
+            description = "Возвращает список всех брендов",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Бренды успешно получены")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getAllBrands() {
+        return standardResponse("Бренды успешно получены", brandService.getAllBrands());
     }
 
     @GetMapping("/brands/{id}")
-    public ResponseEntity<BrandDTO> getBrandById(@PathVariable Long id) {
-        return ResponseEntity.ok(brandService.getBrandById(id));
+    @Operation(
+            summary = "Получить бренд по ID",
+            description = "Возвращает данные бренда по его уникальному идентификатору",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Бренд успешно получен"),
+                    @ApiResponse(responseCode = "404", description = "Бренд не найден")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getBrandById(@PathVariable Long id) {
+        return standardResponse("Бренд успешно получен", brandService.getBrandById(id));
     }
 
-    //методы для характеристик
     @GetMapping("/features")
-    public ResponseEntity<List<FeatureDTO>> getAllFeatures() {
+    @Operation(
+            summary = "Получить характеристики",
+            description = "Возвращает список всех характеристик",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Характеристики успешно получены")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getAllFeatures() {
         List<FeatureDTO> features = featureService.getAllFeatures();
-        return ResponseEntity.ok(features);
+        return standardResponse("Характеристики получен успешно", features);
     }
 
     @GetMapping("/features/{id}")
-    public ResponseEntity<FeatureDTO> getFeatureById(@PathVariable Long id) {
+    @Operation(
+            summary = "Получить характеристику по ID",
+            description = "Возвращает данные характеристики по её уникальному идентификатору",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Характеристика успешно получена"),
+                    @ApiResponse(responseCode = "404", description = "Характеристика не найдена")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getFeatureById(@PathVariable Long id) {
         FeatureDTO featureDTO = featureService.getFeatureById(id);
         if (featureDTO == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(featureDTO);
+        return standardResponse("Характеристика успешно получен", featureDTO);
     }
-
 }

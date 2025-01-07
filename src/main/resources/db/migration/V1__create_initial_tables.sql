@@ -33,17 +33,21 @@ CREATE TABLE users (
                        email VARCHAR(255) UNIQUE NOT NULL,
                        password VARCHAR(255) NOT NULL,
                        phone_number VARCHAR(20),
-                       enabled BOOLEAN NOT NULL DEFAULT FALSE
+                       enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                       role_id INTEGER REFERENCES roles (id)
 );
 
--- Таблица адресов
+-- Таблица адресов---
 CREATE TABLE addresses (
                            id SERIAL PRIMARY KEY,
                            country VARCHAR(255) NOT NULL,
                            city VARCHAR(255) NOT NULL,
                            region VARCHAR(255),
                            street VARCHAR(255) NOT NULL,
-                           postal_code VARCHAR(20),
+                           postal_code VARCHAR(255),
+                           entrance VARCHAR(255),
+                           apartment_office VARCHAR(255),
+                           courier_comments VARCHAR(255),
                            user_id INTEGER REFERENCES users (id)
 );
 
@@ -70,7 +74,7 @@ CREATE TABLE orders (
                         user_id INTEGER REFERENCES users (id),
                         total_price DECIMAL(15, 2) NOT NULL,
                         status VARCHAR(50) NOT NULL,
-                        delivery_address_id INTEGER REFERENCES addresses (id),
+                        address_id INTEGER REFERENCES addresses (id) UNIQUE,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

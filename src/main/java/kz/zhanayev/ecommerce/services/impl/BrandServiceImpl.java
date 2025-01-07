@@ -1,11 +1,11 @@
 package kz.zhanayev.ecommerce.services.impl;
 
 import kz.zhanayev.ecommerce.dto.BrandDTO;
-import kz.zhanayev.ecommerce.exceptions.BrandNotFoundException;
-import kz.zhanayev.ecommerce.facade.BrandFacade;
+import kz.zhanayev.ecommerce.exceptions.NotFoundException;
 import kz.zhanayev.ecommerce.models.Brand;
 import kz.zhanayev.ecommerce.repositories.BrandRepository;
 import kz.zhanayev.ecommerce.services.BrandService;
+import kz.zhanayev.ecommerce.util.mappers.BrandMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,35 +15,32 @@ import java.util.stream.Collectors;
 public class BrandServiceImpl implements BrandService {
 
     private final BrandRepository brandRepository;
-    private final BrandFacade brandFacade;
 
-    public BrandServiceImpl(BrandRepository brandRepository, BrandFacade brandFacade) {
+    public BrandServiceImpl(BrandRepository brandRepository) {
         this.brandRepository = brandRepository;
-        this.brandFacade = brandFacade;
     }
-
 
     @Override
     public BrandDTO createBrand(BrandDTO brandDTO) {
-        Brand brand = brandFacade.toEntity(brandDTO);
+        Brand brand = BrandMapper.toEntity(brandDTO);
         Brand savedBrand = brandRepository.save(brand);
-        return brandFacade.toDTO(savedBrand);
+        return BrandMapper.toDTO(savedBrand);
     }
 
     @Override
     public BrandDTO updateBrand(Long id, BrandDTO brandDTO) {
         Brand existingBrand = brandRepository.findById(id)
-                .orElseThrow(() -> new BrandNotFoundException("Brand not found with id: " + id));
+                .orElseThrow(() -> new NotFoundException("Бренд не найден по идентификатору: " + id));
         existingBrand.setName(brandDTO.getName());
         existingBrand.setDescription(brandDTO.getDescription());
         Brand updatedBrand = brandRepository.save(existingBrand);
-        return brandFacade.toDTO(updatedBrand);
+        return BrandMapper.toDTO(updatedBrand);
     }
 
     @Override
     public void deleteBrand(Long id) {
         if (!brandRepository.existsById(id)) {
-            throw new BrandNotFoundException("Brand not found with id: " + id);
+            throw new NotFoundException("Бренд не найден по идентификатору: " + id);
         }
         brandRepository.deleteById(id);
     }
@@ -52,14 +49,14 @@ public class BrandServiceImpl implements BrandService {
     public List<BrandDTO> getAllBrands() {
         return brandRepository.findAll()
                 .stream()
-                .map(brandFacade::toDTO)
+                .map(BrandMapper::toDTO)
                 .collect(Collectors.toList());
     }
 
     @Override
     public BrandDTO getBrandById(Long id) {
         Brand brand = brandRepository.findById(id)
-                .orElseThrow(() -> new BrandNotFoundException("Brand not found with id: " + id));
-        return brandFacade.toDTO(brand);
+                .orElseThrow(() -> new NotFoundException("Бренд не найден по идентификатору: " + id));
+        return BrandMapper.toDTO(brand);
     }
 }

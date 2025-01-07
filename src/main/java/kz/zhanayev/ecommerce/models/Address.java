@@ -30,15 +30,19 @@ public class Address {
     private String street;
 
     @Pattern(regexp = "^[0-9]{5}$", message = "Postal code must be 5 digits")
+    @Column(name = "postal_code")
     private String postalCode;
 
     @NotBlank
+    @Column(name = "entrance")
     private String entrance; // Подъезд
 
     @NotBlank
+    @Column(name = "apartment_office")
     private String apartmentOffice; // Квартира/Офис
 
     @NotBlank
+    @Column(name = "courier_comments")
     private String courierComments; // Комментарии к курьеру
 
     @NotNull

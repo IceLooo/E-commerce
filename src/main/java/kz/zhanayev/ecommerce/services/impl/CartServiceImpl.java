@@ -2,9 +2,7 @@ package kz.zhanayev.ecommerce.services.impl;
 
 import kz.zhanayev.ecommerce.dto.CartDTO;
 import kz.zhanayev.ecommerce.dto.CartItemDTO;
-import kz.zhanayev.ecommerce.exceptions.CartNotFoundException;
-import kz.zhanayev.ecommerce.exceptions.ResourceNotFoundException;
-import kz.zhanayev.ecommerce.facade.CartFacade;
+import kz.zhanayev.ecommerce.exceptions.NotFoundException;
 import kz.zhanayev.ecommerce.models.Cart;
 import kz.zhanayev.ecommerce.models.CartItem;
 import kz.zhanayev.ecommerce.models.Product;
@@ -12,6 +10,7 @@ import kz.zhanayev.ecommerce.models.User;
 import kz.zhanayev.ecommerce.repositories.CartRepository;
 import kz.zhanayev.ecommerce.repositories.ProductRepository;
 import kz.zhanayev.ecommerce.services.CartService;
+import kz.zhanayev.ecommerce.util.mappers.CartMapper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -20,21 +19,18 @@ import java.math.BigDecimal;
 public class CartServiceImpl implements CartService {
 
     private final CartRepository cartRepository;
-    private final CartFacade cartFacade;
     private final ProductRepository productRepository;
 
-    public CartServiceImpl(CartRepository cartRepository, CartFacade cartFacade, ProductRepository productRepository) {
+    public CartServiceImpl(CartRepository cartRepository, ProductRepository productRepository) {
         this.cartRepository = cartRepository;
-        this.cartFacade = cartFacade;
         this.productRepository = productRepository;
     }
-
 
     @Override
     public CartDTO getCartByUserId(Long userId) {
         Cart cart = cartRepository.findByUserId(userId)
-                .orElseThrow(() -> new CartNotFoundException("Cart not found for user ID: " + userId));
-        return cartFacade.toDTO(cart);
+                .orElseThrow(() -> new NotFoundException("Корзина не найдена по идентификатору пользователя: " + userId));
+        return CartMapper.toDTO(cart);
     }
 
     @Override
@@ -42,8 +38,9 @@ public class CartServiceImpl implements CartService {
         // Ищем корзину пользователя или создаём новую
         Cart cart = cartRepository.findByUserId(userId).orElseGet(() -> {
             Cart newCart = new Cart();
-            newCart.setUser(new User());
-            newCart.getUser().setId(userId);// Установка пользователя
+            User user = new User();
+            user.setId(userId);
+            newCart.setUser(user);
             newCart.setTotalPrice(BigDecimal.ZERO);
             return cartRepository.save(newCart);
         });
@@ -62,7 +59,7 @@ public class CartServiceImpl implements CartService {
         } else {
             // Получаем продукт и добавляем новый элемент в корзину
             Product product = productRepository.findById(cartItemDTO.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + cartItemDTO.getProductId()));
+                    .orElseThrow(() -> new NotFoundException("Продукт не найден с идентификатором: " + cartItemDTO.getProductId()));
 
             CartItem cartItem = new CartItem();
             cartItem.setProduct(product);
@@ -74,27 +71,26 @@ public class CartServiceImpl implements CartService {
 
         // Обновляем общую стоимость корзины
         updateTotalPrice(cart);
-        return cartFacade.toDTO(cartRepository.save(cart));
+        return CartMapper.toDTO(cartRepository.save(cart));
     }
 
     @Override
     public CartDTO removeItemFromCart(Long userId, Long itemId) {
         Cart cart = cartRepository.findByUserId(userId)
-                .orElseThrow(() -> new CartNotFoundException("Cart not found for user ID: " + userId));
+                .orElseThrow(() -> new NotFoundException("Корзина не найдена по идентификатору пользователя: " + userId));
         cart.getCartItems().removeIf(item -> item.getId().equals(itemId));
         updateTotalPrice(cart);
-        return cartFacade.toDTO(cartRepository.save(cart));
+        return CartMapper.toDTO(cartRepository.save(cart));
     }
 
     @Override
     public CartDTO clearCart(Long userId) {
         Cart cart = cartRepository.findByUserId(userId)
-                .orElseThrow(() -> new CartNotFoundException("Cart not found for user ID: " + userId));
+                .orElseThrow(() -> new NotFoundException("Корзина не найдена по идентификатору пользователя: " + userId));
         cart.getCartItems().clear();
         updateTotalPrice(cart);
-        return cartFacade.toDTO(cartRepository.save(cart));
+        return CartMapper.toDTO(cartRepository.save(cart));
     }
-
 
     private void updateTotalPrice(Cart cart) {
         BigDecimal totalPrice = cart.getCartItems().stream()

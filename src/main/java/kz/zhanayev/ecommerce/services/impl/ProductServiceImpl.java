@@ -1,8 +1,7 @@
 package kz.zhanayev.ecommerce.services.impl;
 
 import kz.zhanayev.ecommerce.dto.ProductDTO;
-import kz.zhanayev.ecommerce.exceptions.ResourceNotFoundException;
-import kz.zhanayev.ecommerce.facade.ProductFacade;
+import kz.zhanayev.ecommerce.exceptions.NotFoundException;
 import kz.zhanayev.ecommerce.models.Brand;
 import kz.zhanayev.ecommerce.models.Category;
 import kz.zhanayev.ecommerce.models.Product;
@@ -12,6 +11,7 @@ import kz.zhanayev.ecommerce.repositories.ProductRepository;
 import kz.zhanayev.ecommerce.services.ImageService;
 import kz.zhanayev.ecommerce.services.ProductService;
 import kz.zhanayev.ecommerce.specifications.ProductSpecifications;
+import kz.zhanayev.ecommerce.util.mappers.ProductMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,70 +28,64 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
-    private final ProductFacade productFacade;
     private final ProductSpecifications productSpecifications;
     private final ImageService imageService;
 
     public ProductServiceImpl(ProductRepository productRepository, CategoryRepository categoryRepository,
-                              BrandRepository brandRepository, ProductFacade productFacade,
-                              ProductSpecifications productSpecifications, ImageService imageService) {
+                              BrandRepository brandRepository, ProductSpecifications productSpecifications,
+                              ImageService imageService) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.brandRepository = brandRepository;
-        this.productFacade = productFacade;
         this.productSpecifications = productSpecifications;
         this.imageService = imageService;
     }
 
     @Override
     public ProductDTO createProduct(ProductDTO productDTO, MultipartFile file) {
-        Product product = productFacade.productDTOToProduct(productDTO);
-
         Category category = categoryRepository.findById(productDTO.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with ID: " + productDTO.getCategoryId()));
-        product.setCategory(category);
+                .orElseThrow(() -> new NotFoundException("Категория с идентификатором не найдена: " + productDTO.getCategoryId()));
 
         Brand brand = brandRepository.findById(productDTO.getBrandId())
-                .orElseThrow(() -> new ResourceNotFoundException("Brand not found with ID: " + productDTO.getBrandId()));
-        product.setBrand(brand);
+                .orElseThrow(() -> new NotFoundException("Бренд не найден по идентификатору: " + productDTO.getBrandId()));
 
-        // Handle image upload
+        Product product = ProductMapper.toEntity(productDTO, category, brand);
+
         if (file != null && !file.isEmpty()) {
             String imageUrl = imageService.uploadImage(file);
             product.setImageUrl(imageUrl);
         }
 
         Product savedProduct = productRepository.save(product);
-        return productFacade.productToProductDTO(savedProduct);
+        return ProductMapper.toDTO(savedProduct);
     }
 
     @Override
     public ProductDTO updateProduct(Long id, ProductDTO productDTO, MultipartFile file) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
+                .orElseThrow(() -> new NotFoundException("Продукт не найден с идентификатором: " + id));
+
+        Category category = categoryRepository.findById(productDTO.getCategoryId())
+                .orElseThrow(() -> new NotFoundException("Категория с идентификатором не найдена: " + productDTO.getCategoryId()));
+
+        Brand brand = brandRepository.findById(productDTO.getBrandId())
+                .orElseThrow(() -> new NotFoundException("Бренд не найден по идентификатору: " + productDTO.getBrandId()));
 
         product.setName(productDTO.getName());
         product.setDescription(productDTO.getDescription());
         product.setPrice(productDTO.getPrice());
         product.setStock(productDTO.getStock());
         product.setWeight(productDTO.getWeight());
-
-        Category category = categoryRepository.findById(productDTO.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with ID: " + productDTO.getCategoryId()));
         product.setCategory(category);
-
-        Brand brand = brandRepository.findById(productDTO.getBrandId())
-                .orElseThrow(() -> new ResourceNotFoundException("Brand not found with ID: " + productDTO.getBrandId()));
         product.setBrand(brand);
 
-        // Handle image upload
         if (file != null && !file.isEmpty()) {
             String imageUrl = imageService.uploadImage(file);
             product.setImageUrl(imageUrl);
         }
 
         Product updatedProduct = productRepository.save(product);
-        return productFacade.productToProductDTO(updatedProduct);
+        return ProductMapper.toDTO(updatedProduct);
     }
 
     @Override
@@ -99,20 +93,20 @@ public class ProductServiceImpl implements ProductService {
         Pageable pageable = PageRequest.of(page, size,
                 sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending());
         Page<Product> productPage = productRepository.findAll(pageable);
-        return productPage.map(productFacade::productToProductDTO);
+        return productPage.map(ProductMapper::toDTO);
     }
 
     @Override
     public ProductDTO getProductById(Long id) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
-        return productFacade.productToProductDTO(product);
+                .orElseThrow(() -> new NotFoundException("Продукт не найден с идентификатором: " + id));
+        return ProductMapper.toDTO(product);
     }
 
     @Override
     public void deleteProduct(Long id) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
+                .orElseThrow(() -> new NotFoundException("Продукт не найден с идентификатором: " + id));
         productRepository.delete(product);
     }
 
@@ -128,6 +122,6 @@ public class ProductServiceImpl implements ProductService {
                 .and(productSpecifications.isInStock(inStock));
 
         Page<Product> productPage = productRepository.findAll(spec, pageable);
-        return productPage.map(productFacade::productToProductDTO);
+        return productPage.map(ProductMapper::toDTO);
     }
 }

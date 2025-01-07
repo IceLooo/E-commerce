@@ -1,17 +1,15 @@
-package kz.zhanayev.ecommerce.facade;
+package kz.zhanayev.ecommerce.util.mappers;
 
-import kz.zhanayev.ecommerce.dto.FeatureDTO;
 import kz.zhanayev.ecommerce.dto.ProductDTO;
+import kz.zhanayev.ecommerce.models.Brand;
+import kz.zhanayev.ecommerce.models.Category;
 import kz.zhanayev.ecommerce.models.Feature;
 import kz.zhanayev.ecommerce.models.Product;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-@Component
-public class ProductFacade {
-
-    public ProductDTO productToProductDTO(Product product) {
+public class ProductMapper {
+    public static ProductDTO toDTO(Product product) {
         ProductDTO productDTO = new ProductDTO();
         productDTO.setId(product.getId());
         productDTO.setName(product.getName());
@@ -19,26 +17,20 @@ public class ProductFacade {
         productDTO.setPrice(product.getPrice());
         productDTO.setStock(product.getStock());
         productDTO.setWeight(product.getWeight());
-        productDTO.setBrandId(product.getBrand().getId());
-
-        if (product.getCategory() != null) {
-            productDTO.setCategoryId(product.getCategory().getId());
-        }
-
         productDTO.setImageUrl(product.getImageUrl());
-        List<FeatureDTO> features = product.getFeatures().stream().map(feature -> {
-            FeatureDTO dto = new FeatureDTO();
-            dto.setId(feature.getId());
-            dto.setName(feature.getName());
-            dto.setValue(feature.getValue());
-            return dto;
+        List<Feature> features = productDTO.getFeatures().stream().map(dto -> {
+            Feature feature = new Feature();
+            feature.setName(dto.getName());
+            feature.setValue(dto.getValue());
+            feature.setProduct(product);
+            return feature;
         }).toList();
-
-        productDTO.setFeatures(features);
+        productDTO.setCategoryId(product.getCategory().getId());
+        productDTO.setBrandId(product.getBrand().getId());
         return productDTO;
     }
 
-    public Product productDTOToProduct(ProductDTO productDTO) {
+    public static Product toEntity(ProductDTO productDTO, Category category, Brand brand) {
         Product product = new Product();
         product.setId(productDTO.getId());
         product.setName(productDTO.getName());
@@ -54,7 +46,8 @@ public class ProductFacade {
             feature.setProduct(product);
             return feature;
         }).toList();
-        product.setFeatures(features);
+        product.setCategory(category);
+        product.setBrand(brand);
         return product;
     }
 }

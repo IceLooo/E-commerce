@@ -1,13 +1,10 @@
-package kz.zhanayev.ecommerce.facade;
+package kz.zhanayev.ecommerce.util.mappers;
 
 import kz.zhanayev.ecommerce.dto.BrandDTO;
 import kz.zhanayev.ecommerce.models.Brand;
-import org.springframework.stereotype.Component;
 
-@Component
-public class BrandFacade {
-    // Преобразование из Brand в BrandDTO
-    public BrandDTO toDTO(Brand brand) {
+public class BrandMapper {
+    public static BrandDTO toDTO(Brand brand) {
         BrandDTO brandDTO = new BrandDTO();
         brandDTO.setId(brand.getId());
         brandDTO.setName(brand.getName());
@@ -15,8 +12,7 @@ public class BrandFacade {
         return brandDTO;
     }
 
-    // Преобразование из BrandDTO в Brand
-    public Brand toEntity(BrandDTO brandDTO) {
+    public static Brand toEntity(BrandDTO brandDTO) {
         Brand brand = new Brand();
         brand.setId(brandDTO.getId());
         brand.setName(brandDTO.getName());

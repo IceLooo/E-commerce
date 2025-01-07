@@ -2,11 +2,7 @@ package kz.zhanayev.ecommerce.services.impl;
 
 import kz.zhanayev.ecommerce.dto.CartDTO;
 import kz.zhanayev.ecommerce.dto.OrderDTO;
-import kz.zhanayev.ecommerce.exceptions.EmptyCartException;
-import kz.zhanayev.ecommerce.exceptions.InvalidOrderStatusException;
-import kz.zhanayev.ecommerce.exceptions.ResourceNotFoundException;
-import kz.zhanayev.ecommerce.facade.CartFacade;
-import kz.zhanayev.ecommerce.facade.OrderFacade;
+import kz.zhanayev.ecommerce.exceptions.NotFoundException;
 import kz.zhanayev.ecommerce.models.*;
 import kz.zhanayev.ecommerce.models.enums.OrderStatus;
 import kz.zhanayev.ecommerce.repositories.AddressRepository;
@@ -14,6 +10,8 @@ import kz.zhanayev.ecommerce.repositories.OrderRepository;
 import kz.zhanayev.ecommerce.repositories.ProductRepository;
 import kz.zhanayev.ecommerce.services.CartService;
 import kz.zhanayev.ecommerce.services.OrderService;
+import kz.zhanayev.ecommerce.util.mappers.CartMapper;
+import kz.zhanayev.ecommerce.util.mappers.OrderMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -26,23 +24,19 @@ import java.util.stream.Collectors;
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
-    private final OrderFacade orderFacade;
     private final CartService cartService;
-    private final CartFacade cartFacade;
     private final AddressRepository addressRepository;
     private final ProductRepository productRepository;
 
     public OrderServiceImpl(OrderRepository orderRepository,
-                            OrderFacade orderFacade,
-                            CartService cartService, CartFacade cartFacade, AddressRepository addressRepository, ProductRepository productRepository) {
+                            CartService cartService,
+                            AddressRepository addressRepository,
+                            ProductRepository productRepository) {
         this.orderRepository = orderRepository;
-        this.orderFacade = orderFacade;
         this.cartService = cartService;
-        this.cartFacade = cartFacade;
         this.addressRepository = addressRepository;
         this.productRepository = productRepository;
     }
-
 
     @Override
     public List<OrderDTO> getAllOrders(String status) {
@@ -52,37 +46,37 @@ public class OrderServiceImpl implements OrderService {
                 OrderStatus orderStatus = OrderStatus.valueOf(status.toUpperCase());
                 orders = orderRepository.findByStatus(orderStatus);
             } catch (IllegalArgumentException e) {
-                throw new RuntimeException("Invalid status: " + status);
+                throw new NotFoundException("Недопустимый статус: " + status);
             }
         } else {
             orders = orderRepository.findAll();
         }
         return orders.stream()
-                .map(orderFacade::orderToOrderDTO)
+                .map(OrderMapper::toDTO)
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<OrderDTO> getAllOrdersByUserId(Long userId) {
         return orderRepository.findByUserId(userId).stream()
-                .map(orderFacade::orderToOrderDTO)
+                .map(OrderMapper::toDTO)
                 .collect(Collectors.toList());
     }
 
     @Override
     public OrderDTO getOrderById(Long id) {
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + id));
-        return orderFacade.orderToOrderDTO(order);
+                .orElseThrow(() -> new NotFoundException("Заказ с идентификатором не найден: " + id));
+        return OrderMapper.toDTO(order);
     }
 
     @Override
     public OrderDTO createOrderFromCart(Long userId, Address deliveryAddress) {
         CartDTO cartDTO = cartService.getCartByUserId(userId);
-        Cart cart = cartFacade.toEntity(cartDTO);
+        Cart cart = CartMapper.toEntity(cartDTO);
 
         if (cart.getCartItems().isEmpty()) {
-            throw new EmptyCartException("Cannot create order from an empty cart.");
+            throw new NotFoundException("Не удается создать заказ из пустой корзины");
         }
 
         deliveryAddress.setUser(cart.getUser()); // Привязка пользователя к адресу
@@ -95,7 +89,7 @@ public class OrderServiceImpl implements OrderService {
 
         List<OrderItem> orderItems = cart.getCartItems().stream().map(cartItem -> {
             Product product = productRepository.findById(cartItem.getProduct().getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + cartItem.getProduct().getId()));
+                    .orElseThrow(() -> new NotFoundException("Продукт не найден с идентификатором: " + cartItem.getProduct().getId()));
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(order);
             orderItem.setProduct(product); // Здесь явно загружаем продукт
@@ -109,19 +103,19 @@ public class OrderServiceImpl implements OrderService {
 
         cartService.clearCart(userId);
         Order savedOrder = orderRepository.save(order);
-        return orderFacade.orderToOrderDTO(savedOrder);
+        return OrderMapper.toDTO(savedOrder);
     }
 
     @Override
     public OrderDTO updateOrderStatus(Long id, String status) {
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + id));
+                .orElseThrow(() -> new NotFoundException("Заказ с идентификатором не найден: " + id));
         try {
             OrderStatus newStatus = OrderStatus.valueOf(status.toUpperCase());
             order.setStatus(newStatus);
-            return orderFacade.orderToOrderDTO(orderRepository.save(order));
+            return OrderMapper.toDTO(orderRepository.save(order));
         } catch (IllegalArgumentException e) {
-            throw new InvalidOrderStatusException("Invalid status: " + status, e);
+            throw new NotFoundException("Недопустимый статус: " + status);
         }
     }
 
@@ -135,10 +129,10 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public void deleteOrder(Long id, Long userId) {
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + id));
+                .orElseThrow(() -> new NotFoundException("Заказ с идентификатором не найден: " + id));
 
         if (!order.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Unauthorized to delete this order");
+            throw new NotFoundException("Неавторизованный для удаления этого заказа");
         }
         orderRepository.delete(order);
     }

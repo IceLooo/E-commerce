@@ -29,6 +29,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll() // Доступ для всех
                         .requestMatchers("/api/admin/**").hasRole("ADMIN") // Только администраторы
                         .requestMatchers("/api/user/**").hasRole("USER") // Только пользователи
+                        .requestMatchers("/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**").permitAll() // Разрешить доступ к Swagger UI
                         .anyRequest().authenticated() // Остальные запросы требуют аутентификации
                 )
                 .sessionManagement(session -> session

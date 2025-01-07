@@ -2,7 +2,7 @@ package kz.zhanayev.ecommerce.services.impl;
 
 import kz.zhanayev.ecommerce.dto.LoginRequestDTO;
 import kz.zhanayev.ecommerce.dto.RegisterUserDTO;
-import kz.zhanayev.ecommerce.exceptions.ResourceNotFoundException;
+import kz.zhanayev.ecommerce.exceptions.NotFoundException;
 import kz.zhanayev.ecommerce.models.Role;
 import kz.zhanayev.ecommerce.models.enums.RoleName;
 import kz.zhanayev.ecommerce.models.User;
@@ -16,7 +16,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -38,7 +37,6 @@ public class UserServiceImpl implements UserService {
         this.roleRepository = roleRepository;
     }
 
-
     @Override
     public User saveUser(User user) {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
@@ -47,13 +45,14 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User getUserById(Long id) {
-        return userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+        return userRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден с идентификатором: " + id));
     }
 
     @Override
     public User getUserByUsername(String username) {
         return userRepository.findByEmail(username)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден с именем: " + username));
     }
 
     @Override
@@ -68,13 +67,11 @@ public class UserServiceImpl implements UserService {
         user.setEnabled(true);
 
         Role userRole = roleRepository.findByName(RoleName.USER)
-                .orElseThrow(() -> new ResourceNotFoundException("Default role not found"));
+                .orElseThrow(() -> new NotFoundException("Роль по умолчанию не найдена"));
 
         user.setRole(userRole);
         userRepository.save(user);
-
     }
-
 
     @Override
     public String authenticateUser(LoginRequestDTO loginRequestDTO) {
@@ -94,7 +91,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void createAdmin(String email, String password, String firstName, String lastName, String phoneNumber) {
         if (userRepository.findByEmail(email).isPresent()) {
-            throw new IllegalArgumentException("User with this email already exists.");
+            throw new IllegalArgumentException("Пользователь с таким адресом электронной почты уже существует.");
         }
 
         User admin = new User();
@@ -106,7 +103,7 @@ public class UserServiceImpl implements UserService {
         admin.setEnabled(true);
 
         Role adminRole = roleRepository.findByName(RoleName.ADMIN)
-                .orElseThrow(() -> new ResourceNotFoundException("Admin role not found"));
+                .orElseThrow(() -> new NotFoundException("Роль администратора не найдена"));
 
         admin.setRole(adminRole);
         userRepository.save(admin);

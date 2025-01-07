@@ -1,5 +1,10 @@
 package kz.zhanayev.ecommerce.controllers;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import kz.zhanayev.ecommerce.dto.LoginRequestDTO;
 import kz.zhanayev.ecommerce.dto.RegisterUserDTO;
 import kz.zhanayev.ecommerce.services.UserService;
@@ -16,8 +21,8 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "Authentication", description = "API для аутентификации и регистрации пользователей")
 public class AuthController {
-
 
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
@@ -30,6 +35,17 @@ public class AuthController {
     }
 
     @PostMapping("/register")
+    @Operation(
+            summary = "Регистрация пользователя",
+            description = "Регистрирует нового пользователя в системе",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Пользователь успешно зарегистрирован",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(example = "{ \"message\": \"Вы успешно зарегались, поздравляю.\" }"))
+                    ),
+                    @ApiResponse(responseCode = "400", description = "Ошибка в данных запроса")
+            }
+    )
     public ResponseEntity<Map<String, String>> registerUser(@RequestBody RegisterUserDTO registerUserDTO) {
         userService.registerUser(registerUserDTO);
         Map<String, String> response = new HashMap<>();
@@ -38,6 +54,17 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @Operation(
+            summary = "Вход пользователя",
+            description = "Аутентификация пользователя и генерация JWT токена",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Успешный вход и получение JWT токена",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = JwtResponse.class))
+                    ),
+                    @ApiResponse(responseCode = "401", description = "Неверные учетные данные")
+            }
+    )
     public ResponseEntity<JwtResponse> login(@RequestBody LoginRequestDTO loginRequestDTO) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -55,18 +82,8 @@ public class AuthController {
         return ResponseEntity.ok(new JwtResponse(token));
     }
 
-//    @GetMapping("/confirm")
-//    public ResponseEntity<String> confirmUser(@RequestParam("token") String token) {
-//        String username = jwtUtil.extractUsername(token); // Извлекаем username из токена
-//        if (!jwtUtil.validateToken(token, username)) {    // Передаём токен и username для валидации
-//            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
-//        }
-//        userService.confirmUser(token);
-//        return ResponseEntity.ok("Регистрация подтверждена, теперь вы можете войти в систему.");
-//    }
-
-
     // DTO для JWT ответа
+    @Schema(name = "JWT Response", description = "Объект ответа с токеном JWT")
     static class JwtResponse {
         private String token;
 
