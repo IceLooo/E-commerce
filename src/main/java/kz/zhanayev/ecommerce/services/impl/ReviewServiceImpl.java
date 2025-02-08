@@ -66,4 +66,5 @@ public class ReviewServiceImpl implements ReviewService {
                 .orElseThrow(() -> new NotFoundException("Отзыв с идентификатором не найден: " + reviewId));
         reviewRepository.delete(review);
     }
+
 }

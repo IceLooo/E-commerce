@@ -2,6 +2,7 @@ package kz.zhanayev.ecommerce.controllers.user;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import kz.zhanayev.ecommerce.dto.*;
@@ -18,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/api/user")
 @Tag(name = "User API", description = "API для работы с действиями пользователей")
@@ -263,6 +265,23 @@ public class UserController {
     public ResponseEntity<Map<String, Object>> getReviewsByUserId(@PathVariable Long userId) {
         List<ReviewDTO> reviews = reviewService.getReviewsByUserId(userId);
         return standardResponse("Отзывы пользователей получены успешно", reviews);
+    }
+
+    @DeleteMapping("/reviews/{reviewId}")
+    @Operation(
+            summary = "Удалить отзыв",
+            description = "Удаляет отзыв текущего пользователя",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Отзыв успешно удален"),
+                    @ApiResponse(responseCode = "404", description = "Отзыв не найден")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> deleteReview(@PathVariable Long reviewId) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        Long userId = userService.getUserByUsername(username).getId();
+
+        reviewService.deleteReview(reviewId);
+        return standardResponse("Отзыв успешно удален", null);
     }
 
     @GetMapping("/categories")

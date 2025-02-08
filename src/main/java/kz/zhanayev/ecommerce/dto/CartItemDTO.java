@@ -17,7 +17,7 @@ public class CartItemDTO {
     @Schema(description = "Идентификатор продукта, связанного с этим элементом", example = "101")
     private Long productId;
 
-    @Schema(description = "Название продукта", example = "Ноутбук Bosch Drill")
+    @Schema(description = "Название продукта", example = "Bosch Drill")
     private String productName;
 
     @Schema(description = "Количество продукта в корзине", example = "2")

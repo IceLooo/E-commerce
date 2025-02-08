@@ -23,4 +23,13 @@ public class Feature {
     @ManyToOne
     @JoinColumn(name = "product_id")
     private Product product;
+
+    public Feature(String name, String value, Product product) {
+        this.name = name;
+        this.value = value;
+        this.product = product;
+    }
+
+    public Feature() {
+    }
 }

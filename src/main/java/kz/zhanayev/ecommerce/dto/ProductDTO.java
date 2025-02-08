@@ -5,10 +5,12 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
 @Setter
+@Schema(description = "Данные продукта")
 public class ProductDTO {
 
     @Schema(description = "Уникальный идентификатор товара", example = "1")
@@ -36,7 +38,7 @@ public class ProductDTO {
     private Long brandId;
 
     @Schema(description = "Список характеристик товара")
-    private List<FeatureDTO> features;
+    private List<FeatureDTO> features = new ArrayList<>();
 
     @Schema(description = "URL изображения товара", example = "https://example.com/product-image.jpg")
     private String imageUrl;

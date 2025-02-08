@@ -6,8 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-public class
-MinioConfig {
+public class MinioConfig {
 
     @Value("${minio.url}")
     private String minioUrl;

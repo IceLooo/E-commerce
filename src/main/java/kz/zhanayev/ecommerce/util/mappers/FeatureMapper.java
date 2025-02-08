@@ -5,13 +5,14 @@ import kz.zhanayev.ecommerce.models.Feature;
 import kz.zhanayev.ecommerce.models.Product;
 
 public class FeatureMapper {
+
     public static FeatureDTO toDTO(Feature feature) {
-        FeatureDTO featureDTO = new FeatureDTO();
-        featureDTO.setId(feature.getId());
-        featureDTO.setName(feature.getName());
-        featureDTO.setValue(feature.getValue());
-        featureDTO.setProductId(feature.getProduct().getId());
-        return featureDTO;
+        return new FeatureDTO(
+                feature.getId(),
+                feature.getName(),
+                feature.getValue(),
+                feature.getProduct() != null ? feature.getProduct().getId() : null // Проверяем на null
+        );
     }
 
     public static Feature toEntity(FeatureDTO featureDTO, Product product) {

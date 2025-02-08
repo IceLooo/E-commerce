@@ -1,12 +1,16 @@
 package kz.zhanayev.ecommerce.controllers.admin;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import kz.zhanayev.ecommerce.dto.*;
 import kz.zhanayev.ecommerce.services.*;
 import org.springframework.data.domain.Page;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/api/admin")
 @PreAuthorize("hasRole('ADMIN')")
@@ -28,14 +33,18 @@ public class AdminController {
     private final PaymentService paymentService;
     private final BrandService brandService;
     private final FeatureService featureService;
+    private final ObjectMapper objectMapper;
+    private final ReviewService reviewService;
 
-    public AdminController(ProductService productService, OrderService orderService, CategoryService categoryService, PaymentService paymentService, BrandService brandService, FeatureService featureService) {
+    public AdminController(ProductService productService, OrderService orderService, CategoryService categoryService, PaymentService paymentService, BrandService brandService, FeatureService featureService, ObjectMapper objectMapper, ReviewService reviewService) {
         this.productService = productService;
         this.orderService = orderService;
         this.categoryService = categoryService;
         this.paymentService = paymentService;
         this.brandService = brandService;
         this.featureService = featureService;
+        this.objectMapper = objectMapper;
+        this.reviewService = reviewService;
     }
 
     private ResponseEntity<Map<String, Object>> standardResponse(String statusMessage, Object payload) {
@@ -46,37 +55,66 @@ public class AdminController {
     }
 
     // методы для продуктов
-    @PostMapping("/products")
+    @PostMapping(value = "/products", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
             summary = "Создать продукт",
-            description = "Добавляет новый продукт в систему",
-            responses = {
-                    @ApiResponse(responseCode = "200", description = "Продукт успешно создан"),
-                    @ApiResponse(responseCode = "400", description = "Ошибка в данных запроса")
-            }
+            description = "Добавляет новый продукт в систему"
     )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Продукт успешно создан"),
+            @ApiResponse(responseCode = "400", description = "Ошибка в данных запроса")
+    })
     public ResponseEntity<Map<String, Object>> createProduct(
-            @Parameter(description = "Информация о продукте") @RequestPart("product") ProductDTO productDTO,
-            @Parameter(description = "Файл изображения продукта") @RequestPart(value = "file", required = false) MultipartFile file) {
-        ProductDTO createdProduct = productService.createProduct(productDTO, file);
-        return standardResponse("Продукт успешно создан", createdProduct);
+            @Parameter(description = "JSON-объект с информацией о продукте")
+            @RequestPart("product") String productJson,
+
+            @Parameter(description = "Файл изображения продукта")
+            @RequestPart(value = "file", required = false) MultipartFile file) {
+
+        try {
+            // Конвертация JSON-строки в ProductDTO
+            ProductDTO productDTO = objectMapper.readValue(productJson, ProductDTO.class);
+
+            ProductDTO createdProduct = productService.createProduct(productDTO, file);
+            return standardResponse("Продукт успешно создан", createdProduct);
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid JSON format: " + e.getMessage()));
+        }
     }
 
-    @PutMapping("/products/{id}")
+
+
+    @PutMapping(value = "/products/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
             summary = "Обновить продукт",
-            description = "Обновляет данные продукта по его ID",
+            description = "Обновляет данные продукта по его ID, включая изображение",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Продукт успешно обновлен"),
+                    @ApiResponse(responseCode = "400", description = "Ошибка в данных запроса"),
                     @ApiResponse(responseCode = "404", description = "Продукт не найден")
             }
     )
     public ResponseEntity<Map<String, Object>> updateProduct(
             @Parameter(description = "ID продукта", example = "1") @PathVariable Long id,
-            @Parameter(description = "Обновлённые данные продукта") @RequestPart("product") ProductDTO productDTO,
-            @Parameter(description = "Новое изображение продукта") @RequestPart(value = "file", required = false) MultipartFile file) {
-        ProductDTO updatedProduct = productService.updateProduct(id, productDTO, file);
-        return standardResponse("Продукт успешно обновлен", updatedProduct);
+            @Parameter(description = "JSON-объект с обновленными данными продукта")
+            @RequestPart("product") String productJson,
+
+            @Parameter(description = "Новое изображение продукта (если нужно обновить)")
+            @RequestPart(value = "file", required = false) MultipartFile file) {
+
+        try {
+            // Конвертация JSON-строки в ProductDTO
+            ProductDTO productDTO = objectMapper.readValue(productJson, ProductDTO.class);
+
+            // Вызов сервиса для обновления продукта
+            ProductDTO updatedProduct = productService.updateProduct(id, productDTO, file);
+
+            return standardResponse("Продукт успешно обновлен", updatedProduct);
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid JSON format: " + e.getMessage()));
+        }
     }
 
     @DeleteMapping("/products/{id}")
@@ -441,5 +479,35 @@ public class AdminController {
             @Parameter(description = "ID заказа", example = "1") @PathVariable Long orderId) {
         PaymentDTO paymentDTO = paymentService.getPaymentByOrderId(orderId);
         return standardResponse("Оплата успешно получена", paymentDTO);
+    }
+
+
+    //методы для отзыва
+    @GetMapping("/reviews")
+    @Operation(
+            summary = "Получить все отзывы",
+            description = "Возвращает список всех отзывов",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Отзывы успешно получены")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> getAllReviews() {
+        List<ReviewDTO> reviews = reviewService.getReviewsByProductId(null); // Получаем все отзывы
+        return standardResponse("Отзывы успешно получены", reviews);
+    }
+
+
+    @DeleteMapping("/reviews/{reviewId}")
+    @Operation(
+            summary = "Удалить отзыв",
+            description = "Удаляет отзыв по его ID",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Отзыв успешно удален"),
+                    @ApiResponse(responseCode = "404", description = "Отзыв не найден")
+            }
+    )
+    public ResponseEntity<Map<String, Object>> deleteReview(@PathVariable Long reviewId) {
+        reviewService.deleteReview(reviewId);
+        return standardResponse("Отзыв успешно удален", null);
     }
 }

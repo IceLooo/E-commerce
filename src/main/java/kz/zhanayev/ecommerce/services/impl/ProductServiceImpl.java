@@ -4,9 +4,11 @@ import kz.zhanayev.ecommerce.dto.ProductDTO;
 import kz.zhanayev.ecommerce.exceptions.NotFoundException;
 import kz.zhanayev.ecommerce.models.Brand;
 import kz.zhanayev.ecommerce.models.Category;
+import kz.zhanayev.ecommerce.models.Feature;
 import kz.zhanayev.ecommerce.models.Product;
 import kz.zhanayev.ecommerce.repositories.BrandRepository;
 import kz.zhanayev.ecommerce.repositories.CategoryRepository;
+import kz.zhanayev.ecommerce.repositories.FeatureRepository;
 import kz.zhanayev.ecommerce.repositories.ProductRepository;
 import kz.zhanayev.ecommerce.services.ImageService;
 import kz.zhanayev.ecommerce.services.ProductService;
@@ -21,6 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ProductServiceImpl implements ProductService {
@@ -30,15 +34,17 @@ public class ProductServiceImpl implements ProductService {
     private final BrandRepository brandRepository;
     private final ProductSpecifications productSpecifications;
     private final ImageService imageService;
+    private final FeatureRepository featureRepository;
 
     public ProductServiceImpl(ProductRepository productRepository, CategoryRepository categoryRepository,
                               BrandRepository brandRepository, ProductSpecifications productSpecifications,
-                              ImageService imageService) {
+                              ImageService imageService, FeatureRepository featureRepository) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.brandRepository = brandRepository;
         this.productSpecifications = productSpecifications;
         this.imageService = imageService;
+        this.featureRepository = featureRepository;
     }
 
     @Override
@@ -51,14 +57,36 @@ public class ProductServiceImpl implements ProductService {
 
         Product product = ProductMapper.toEntity(productDTO, category, brand);
 
+        // ✅ Загружаем изображение, если есть
         if (file != null && !file.isEmpty()) {
             String imageUrl = imageService.uploadImage(file);
             product.setImageUrl(imageUrl);
         }
 
+        // ✅ Сохраняем продукт, чтобы получить его ID
         Product savedProduct = productRepository.save(product);
+
+        // ✅ Обновляем список `features`
+        if (productDTO.getFeatures() != null && !productDTO.getFeatures().isEmpty()) {
+            // Очищаем старые характеристики
+            savedProduct.getFeatures().clear();
+
+            List<Feature> features = productDTO.getFeatures().stream().map(featureDTO -> {
+                Feature feature = new Feature();
+                feature.setName(featureDTO.getName());
+                feature.setValue(featureDTO.getValue());
+                feature.setProduct(savedProduct); // Привязываем к продукту
+                return feature;
+            }).toList();
+
+            savedProduct.getFeatures().addAll(features); // Добавляем в `Product`
+            featureRepository.saveAll(features); // Сохраняем `features`
+        }
+
         return ProductMapper.toDTO(savedProduct);
     }
+
+
 
     @Override
     public ProductDTO updateProduct(Long id, ProductDTO productDTO, MultipartFile file) {
@@ -71,6 +99,7 @@ public class ProductServiceImpl implements ProductService {
         Brand brand = brandRepository.findById(productDTO.getBrandId())
                 .orElseThrow(() -> new NotFoundException("Бренд не найден по идентификатору: " + productDTO.getBrandId()));
 
+        // Обновляем основные поля
         product.setName(productDTO.getName());
         product.setDescription(productDTO.getDescription());
         product.setPrice(productDTO.getPrice());
@@ -79,14 +108,27 @@ public class ProductServiceImpl implements ProductService {
         product.setCategory(category);
         product.setBrand(brand);
 
+        // Если загружено новое изображение — заменяем старое
         if (file != null && !file.isEmpty()) {
             String imageUrl = imageService.uploadImage(file);
             product.setImageUrl(imageUrl);
         }
 
+        // Обновляем характеристики (features)
+        if (productDTO.getFeatures() != null) {
+            // Удаляем старые характеристики и добавляем новые
+            product.getFeatures().clear();
+            List<Feature> updatedFeatures = productDTO.getFeatures().stream()
+                    .map(dto -> new Feature(dto.getName(), dto.getValue(), product))
+                    .collect(Collectors.toList());
+            product.getFeatures().addAll(updatedFeatures);
+        }
+
+        // Сохраняем обновленный продукт в базе
         Product updatedProduct = productRepository.save(product);
         return ProductMapper.toDTO(updatedProduct);
     }
+
 
     @Override
     public Page<ProductDTO> getAllProducts(int page, int size, String sortBy, String sortDir) {
