@@ -1,20 +1,20 @@
 version: "3.8"
 
 services:
-  # --- PostgreSQL ---
   postgres:
-    image: postgres:latest
+    image: postgres:15
     container_name: ecommerce-db
     environment:
       POSTGRES_DB: ecommerce
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5433:5432"  # на локальной машине -> контейнер
+      - "5433:5432"  # Убедитесь, что в .env указан правильный порт
     networks:
       - ecommerce-network
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
 
-  # --- MinIO ---
   minio:
     image: minio/minio
     container_name: ecommerce-minio
@@ -24,43 +24,38 @@ services:
     command: >
       server /data --console-address :9001
     ports:
-      - "9000:9000"  # доступ к MinIO (API)
-      - "9001:9001"  # доступ к Web UI MinIO
+      - "9000:9000"
+      - "9001:9001"
     networks:
       - ecommerce-network
+    volumes:
+      - minio-data:/data
 
-  # --- Spring Boot-приложение ---
   app:
-    image: icelooo/ecommerce-app:latest  # <-- ключевое изменение: вместо build: .
+    build: .  # Заменено с image на build
     container_name: ecommerce-app
     environment:
-      # Подключение к базе:
       DB_URL: "jdbc:postgresql://postgres:5432/ecommerce"
       DB_USERNAME: "postgres"
       DB_PASSWORD: "postgres"
       DB_DRIVER_CLASS_NAME: "org.postgresql.Driver"
 
-      # JPA:
       SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
       SPRING_JPA_SHOW_SQL: "true"
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: "org.hibernate.dialect.PostgreSQLDialect"
 
-      # Загрузка файлов:
       SPRING_SERVLET_MULTIPART_ENABLED: "true"
       SPRING_SERVLET_MULTIPART_FILE_SIZE_THRESHOLD: "2KB"
       SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: "200MB"
       SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: "200MB"
 
-      # Логирование:
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: "DEBUG"
 
-      # MinIO:
       MINIO_URL: "http://minio:9000"
       MINIO_BUCKET_NAME: "ecommerce-images"
       MINIO_ACCESS_KEY: newuser
       MINIO_SECRET_KEY: newpassword
 
-      # JWT:
       JWT_SECRET_KEY: "8uZV9FrmuDHFOxUPLaoYXmpGyM4HaOa-hvpKZ9t9RUDPGFNTYRnnDckOSCwX7DEw7tp89YggA_G1vZigea701A"
       JWT_EXPIRATION_TIME: "36000000"
 
@@ -71,6 +66,10 @@ services:
       - minio
     networks:
       - ecommerce-network
+
+volumes:
+  postgres-data:
+  minio-data:
 
 networks:
   ecommerce-network:
